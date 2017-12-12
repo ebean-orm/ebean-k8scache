@@ -13,7 +13,7 @@ public class ClusterMessage {
 
   private static final int MAX_LENGTH = 10 * 1024 * 1024;
 
-  private final String registerHost;
+  private final String registerIp;
 
   private final String podName;
 
@@ -24,8 +24,8 @@ public class ClusterMessage {
   /**
    * Create a register message.
    */
-  public static ClusterMessage register(String registerHost, boolean register, String podName) {
-    return new ClusterMessage(registerHost, register, podName);
+  public static ClusterMessage register(String registerIp, boolean register, String podName) {
+    return new ClusterMessage(registerIp, register, podName);
   }
 
   /**
@@ -38,8 +38,8 @@ public class ClusterMessage {
   /**
    * Create for register online/offline message.
    */
-  private ClusterMessage(String registerHost, boolean register, String podName) {
-    this.registerHost = registerHost;
+  private ClusterMessage(String registerIp, boolean register, String podName) {
+    this.registerIp = registerIp;
     this.register = register;
     this.podName = podName;
     this.data = null;
@@ -50,18 +50,18 @@ public class ClusterMessage {
    */
   private ClusterMessage(byte[] data) {
     this.data = data;
-    this.registerHost = null;
+    this.registerIp = null;
     this.podName = null;
     this.register = false;
   }
 
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    if (registerHost != null) {
+    if (registerIp != null) {
       sb.append("register ");
       sb.append(register);
       sb.append(" ");
-      sb.append(registerHost);
+      sb.append(registerIp);
     } else {
       sb.append("[data]");
     }
@@ -72,14 +72,14 @@ public class ClusterMessage {
    * Return true if this is a register event as opposed to a transaction message.
    */
   public boolean isRegisterEvent() {
-    return registerHost != null;
+    return registerIp != null;
   }
 
   /**
    * Return the register host for online/offline message.
    */
-  public String getRegisterHost() {
-    return registerHost;
+  public String getRegisterIp() {
+    return registerIp;
   }
 
   public String getPodName() {
@@ -113,7 +113,7 @@ public class ClusterMessage {
     } else {
       // write header message
       dataOutput.writeInt(MsgKeys.HEADER);
-      dataOutput.writeUTF(getRegisterHost());
+      dataOutput.writeUTF(getRegisterIp());
       dataOutput.writeBoolean(register);
       dataOutput.writeUTF(getPodName());
     }
@@ -142,7 +142,7 @@ public class ClusterMessage {
       return new ClusterMessage(host, registered, podName);
 
     } else {
-       throw new InvalidMessageException(key);
+      throw new InvalidMessageException("Invalid message key:" + key);
     }
   }
 

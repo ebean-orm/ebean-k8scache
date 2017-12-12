@@ -1,9 +1,10 @@
 package io.ebeaninternal.server.cluster.socket;
 
+import io.ebeaninternal.server.cluster.K8sBroadcastFactory;
 import io.ebeaninternal.server.cluster.message.ClusterMessage;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -17,158 +18,126 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 class SocketClient {
 
-  private static final Logger logger = LoggerFactory.getLogger(SocketClient.class);
+	private static final Logger logger = K8sBroadcastFactory.log;
 
-  private final InetSocketAddress address;
+	private final InetSocketAddress address;
 
-  private final String ipPort;
+	private final String ip;
 
-  //private final String hostname;
+	private final String localIp;
 
-  /**
-   * lock guarding all access
-   */
-  private final ReentrantLock lock;
+	/**
+	 * lock guarding all access
+	 */
+	private final ReentrantLock lock;
 
-  private boolean online;
+	private Socket socket;
 
-  private Socket socket;
+	private OutputStream os;
 
-  private OutputStream os;
+	private DataOutputStream dataOutput;
 
-  private DataOutputStream dataOutput;
+	/**
+	 * Construct with an IP address and port.
+	 */
+	SocketClient(String ip, InetSocketAddress address, String localIp) {
+		this.lock = new ReentrantLock(false);
+		this.address = address;
+		this.ip = ip;
+		this.localIp = localIp;
+	}
 
-  /**
-   * Construct with an IP address and port.
-   */
-  SocketClient(String ipPort, InetSocketAddress address) {
-    this.lock = new ReentrantLock(false);
-    this.address = address;
-    this.ipPort = ipPort;
-//    this.hostname = address.getHostString();
-  }
+	public String toString() {
+		return ip;
+	}
 
-//  public String getHostname() {
-//    return hostname;
-//  }
+	String getIp() {
+		return ip;
+	}
 
-  public String toString() {
-    return ipPort;
-  }
+	void reconnect() throws IOException {
+		final ReentrantLock lock = this.lock;
+		lock.lock();
+		try {
+			disconnect();
+			connect();
+		} finally {
+			lock.unlock();
+		}
+	}
 
-  String getIpPort() {
-    return ipPort;
-  }
+	void disconnect() {
+		final ReentrantLock lock = this.lock;
+		lock.lock();
+		try {
+			if (socket != null) {
+				try {
+					socket.close();
+				} catch (IOException e) {
+					logger.debug("Error disconnecting from Cluster member " + localIp, e);
+				}
+				os = null;
+				dataOutput = null;
+				socket = null;
+			}
+		} finally {
+			lock.unlock();
+		}
+	}
 
-  int getPort() {
-    return address.getPort();
-  }
+	boolean register(ClusterMessage registerMsg) {
+		final ReentrantLock lock = this.lock;
+		lock.lock();
+		try {
+			try {
+				setOnline();
+				send(registerMsg);
+				return true;
+			} catch (IOException e) {
+				disconnect();
+				return false;
+			}
+		} finally {
+			lock.unlock();
+		}
+	}
 
-  boolean isOnline() {
-    return online;
-  }
+	void send(ClusterMessage msg) throws IOException {
+		final ReentrantLock lock = this.lock;
+		lock.lock();
+		try {
+			msg.write(dataOutput);
+		} finally {
+			lock.unlock();
+		}
+	}
 
-  void setOnline(boolean online) throws IOException {
-    final ReentrantLock lock = this.lock;
-    lock.lock();
-    try {
-      if (online) {
-        setOnline();
-      } else {
-        disconnect();
-      }
-    } finally {
-      lock.unlock();
-    }
-  }
+	/**
+	 * Set whether the client is thought to be online.
+	 */
+	private void setOnline() throws IOException {
+		connect();
+	}
 
-  void reconnect() throws IOException {
-    final ReentrantLock lock = this.lock;
-    lock.lock();
-    try {
-      disconnect();
-      connect();
-    } finally {
-      lock.unlock();
-    }
-  }
+	private void connect() throws IOException {
+		if (socket != null) {
+			throw new IllegalStateException("Already got a socket connection?");
+		}
+		Socket s = new Socket();
+		s.setKeepAlive(true);
+		s.connect(address);
 
+		this.socket = s;
+		this.os = socket.getOutputStream();
+		this.dataOutput = new DataOutputStream(new BufferedOutputStream(os, 512));
+		sayHello();
+	}
 
-  void disconnect() {
-    final ReentrantLock lock = this.lock;
-    lock.lock();
-    try {
-      this.online = false;
-      if (socket != null) {
-        try {
-          socket.close();
-        } catch (IOException e) {
-          logger.info("K8 Error disconnecting from Cluster member " + ipPort, e);
-        }
-        os = null;
-        dataOutput = null;
-        socket = null;
-      }
-    } finally {
-      lock.unlock();
-    }
-  }
-
-  boolean register(ClusterMessage registerMsg) {
-    final ReentrantLock lock = this.lock;
-    lock.lock();
-    try {
-      try {
-        setOnline();
-        send(registerMsg);
-        return true;
-      } catch (IOException e) {
-        disconnect();
-        return false;
-      }
-    } finally {
-      lock.unlock();
-    }
-  }
-
-  void send(ClusterMessage msg) throws IOException {
-    final ReentrantLock lock = this.lock;
-    lock.lock();
-    try {
-      if (online) {
-        msg.write(dataOutput);
-      }
-    } finally {
-      lock.unlock();
-    }
-  }
-
-  /**
-   * Set whether the client is thought to be online.
-   */
-  private void setOnline() throws IOException {
-    connect();
-    this.online = true;
-  }
-
-  private void connect() throws IOException {
-    if (socket != null) {
-      throw new IllegalStateException("K8 Already got a socket connection?");
-    }
-    Socket s = new Socket();
-    s.setKeepAlive(true);
-    s.connect(address);
-
-    this.socket = s;
-    this.os = socket.getOutputStream();
-    this.dataOutput = new DataOutputStream(os);
-    sayHello();
-  }
-
-  private void sayHello() throws IOException {
-    logger.info("K8 Client saying hello");
-    dataOutput.writeInt(MsgKeys.HELLO);
-    dataOutput.flush();
-  }
+	private void sayHello() throws IOException {
+		logger.debug("saying hello from local:{} to:{}", localIp, ip);
+		dataOutput.writeInt(MsgKeys.HELLO);
+		dataOutput.writeUTF(localIp);
+		dataOutput.flush();
+	}
 
 }

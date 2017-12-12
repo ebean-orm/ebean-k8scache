@@ -2,6 +2,7 @@ package io.ebeaninternal.server.cluster.socket;
 
 import io.ebeaninternal.server.cluster.ClusterBroadcast;
 import io.ebeaninternal.server.cluster.ClusterManager;
+import io.ebeaninternal.server.cluster.K8sBroadcastFactory;
 import io.ebeaninternal.server.cluster.K8sServiceConfig;
 import io.ebeaninternal.server.cluster.message.ClusterMessage;
 import io.ebeaninternal.server.cluster.message.InvalidMessageException;
@@ -10,13 +11,11 @@ import io.ebeaninternal.server.transaction.RemoteTransactionEvent;
 import org.avaje.k8s.discovery.K8sMemberDiscovery;
 import org.avaje.k8s.discovery.K8sServiceMember;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
-import java.util.HashSet;
-import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,13 +26,15 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class K8sClusterBroadcast implements ClusterBroadcast {
 
-	private static final Logger clusterLogger = LoggerFactory.getLogger("io.ebean.cluster");
+	private static final Logger log = K8sBroadcastFactory.log;
 
-	private static final Logger logger = LoggerFactory.getLogger(K8sClusterBroadcast.class);
+	private static final long normalFreqMillis = 300_000;
+
+	private static final long errorFreqMillis = 60_000;
 
 	private final String podName;
 
-	private final Map<String, SocketClient> clientMap = new ConcurrentHashMap<>();
+	private final Map<String, SocketClient> members = new ConcurrentHashMap<>();
 
 	private final SocketClusterListener listener;
 
@@ -45,43 +46,74 @@ public class K8sClusterBroadcast implements ClusterBroadcast {
 
 	private final K8sServiceConfig config;
 
+	private final SocketClientBuilder clientBuilder;
+
 	private final int port;
 
-	private final String ipAddress;
-	private final String localIpPort;
+	private final String localIp;
+
+	private final ClusterMessage registerMessage;
+
+	private volatile long checkStatus;
+
+	private final AtomicLong errorCount = new AtomicLong();
 
 	public K8sClusterBroadcast(ClusterManager manager, K8sServiceConfig config, K8sServiceMember member) {
 
 		this.messageReadWrite = new MessageReadWrite(manager);
 		this.config = config;
 		this.port = config.getPort();
-		this.ipAddress = member.getIpAddress();
-		this.localIpPort = ipAddress + ":" + port;
+		this.localIp = member.getIpAddress();
 		this.podName = member.getPodName();
+		this.clientBuilder = new SocketClientBuilder(localIp);
+		this.registerMessage = ClusterMessage.register(localIp, true, podName);
 
-		clusterLogger.info("K8 Cluster using ip:{} port:{} pod:{} ", port, ipAddress, podName);
+		log.debug("listener using localIp:{} port:{} pod:{} ", localIp, port, podName);
 		this.listener = new SocketClusterListener(this, port, config.getThreadPoolName());
 	}
 
-	private void checkMembership() {
+	String getLocalIp() {
+		return localIp;
+	}
+
+	/**
+	 * Called to indicate a membership should run shortly.
+	 */
+	void checkStatus(boolean hadError) {
+
+		if (hadError) {
+			errorCount.incrementAndGet();
+		}
+		long lastCheck = System.currentTimeMillis() - checkStatus;
+		if (lastCheck > normalFreqMillis) {
+			checkMembership();
+		} else if (errorCount.get() > 0 && lastCheck > errorFreqMillis) {
+			checkMembership();
+		}
+	}
+
+	private synchronized void checkMembership() {
 
 		try {
 			Set<String> expected = loadExpectedMembers();
-			logger.error("K8 checking cluster membership against expected:{}", expected);
-
-			for (String key : clientMap.keySet()) {
+			checkStatus = System.currentTimeMillis();
+			log.debug("check membership - expected:{} current:{}", expected, members.keySet());
+			for (String key : members.keySet()) {
 				if (!expected.contains(key)) {
 					removePeer(key);
 				}
 			}
 
-			for (String ipPort : expected) {
-				if (!clientMap.containsKey(ipPort)) {
-					registerPeer(ipPort, podName);
+			for (String otherId : expected) {
+				if (!members.containsKey(otherId)) {
+					registerPeer(otherId, podName);
 				}
 			}
+
+			errorCount.set(0);
+
 		} catch (Exception e) {
-			logger.error("K8 Error during membership check", e);
+			log.error("Error during membership check", e);
 		}
 	}
 
@@ -89,34 +121,19 @@ public class K8sClusterBroadcast implements ClusterBroadcast {
 
 		K8sMemberDiscovery discovery = config.getDiscovery();
 		discovery.reload();
-
-		List<String> otherIps = discovery.getOtherIps();
-		Set<String> expected = new HashSet<>(otherIps.size());
-		for (String otherIp : otherIps) {
-			expected.add(otherIp + ":" + port);
-		}
-		return expected;
-	}
-
-	String getIpPort() {
-		return localIpPort;
+		return new LinkedHashSet<>(discovery.getOtherIps());
 	}
 
 	/**
 	 * Return the current status of this instance.
 	 */
 	public SocketClusterStatus getStatus() {
-
-		int currentGroupSize = clientMap.size();
-		long txnIn = countIncoming.get();
-		long txnOut = countOutgoing.get();
-
-		return new SocketClusterStatus(currentGroupSize, txnIn, txnOut);
+		return new SocketClusterStatus(members.size(), countIncoming.get(), countOutgoing.get());
 	}
 
 	public void startup() {
 		listener.startListening();
-		registerOnStartup();
+		checkMembership();
 	}
 
 	public void shutdown() {
@@ -124,96 +141,69 @@ public class K8sClusterBroadcast implements ClusterBroadcast {
 		listener.shutdown();
 	}
 
-	/**
-	 * Register with all the other members of the Cluster.
-	 */
-	private void registerOnStartup() {
-
-		ClusterMessage msg = ClusterMessage.register(localIpPort, true, podName);
-
-		K8sMemberDiscovery discovery = config.getDiscovery();
-		discovery.reload();
-		List<String> otherIps = discovery.getOtherIps();
-
-		logger.info("K8 Registering local:{} with cluster members:{}", ipAddress, otherIps);
-
-		for (String otherIp : otherIps) {
-			SocketClient member = SocketClientBuilder.build(otherIp, port);
-			try {
-				clusterLogger.info("K8 Register with member:{}", otherIp);
-				if (member.register(msg)) {
-					clusterLogger.info("K8 Registered as online with member:{}", member);
-					clientMap.put(member.getIpPort(), member);
-				} else {
-					clusterLogger.warn("K8 Unable to register with member:{}", member);
-				}
-			} catch (Exception e) {
-				clusterLogger.warn("K8 Unexpected error when trying to register with member:{}", member);
-			}
-		}
-	}
-
 	private int send(SocketClient client, ClusterMessage msg) {
 
 		try {
 			// alternative would be to connect/disconnect here but prefer to use keep alive
-			if (logger.isDebugEnabled()) {
-				logger.debug("K8 send to member {} broadcast msg: {}", client, msg);
+			if (log.isTraceEnabled()) {
+				log.trace("send to member {} broadcast msg: {}", client, msg);
 			}
 			client.send(msg);
 			return 0;
 
-		} catch (Exception ex) {
-			logger.warn("K8 Error sending message to:" + client, ex);
+		} catch (IOException ex) {
+			log.warn("reconnect due to error sending message to:" + client, ex);
 			try {
 				client.reconnect();
 			} catch (Exception e) {
-				logger.warn("K8 Error trying to reconnect to:" + client + " De-registering it.", ex);
-				clientMap.remove(client.getIpPort());
+				log.warn("Error trying to reconnect to:" + client + " De-registering it.", ex);
+				members.remove(client.getIp());
 			}
 			return 1;
 		}
 	}
 
 	private void setMemberRegister(ClusterMessage message) {
-		synchronized (clientMap) {
-			String ipPort = message.getRegisterHost();
-			if (!message.isRegister()) {
-				removePeer(ipPort);
+		String ipPort = message.getRegisterIp();
+		if (!message.isRegister()) {
+			removePeer(ipPort);
 
+		} else {
+			SocketClient member = members.get(ipPort);
+			if (member != null) {
+				log.warn("Cluster member [{}] already registered?", ipPort);
 			} else {
-				SocketClient member = clientMap.get(ipPort);
-				if (member != null) {
-					clusterLogger.warn("K8 Cluster member [{}] already registered?", ipPort);
-				} else {
-					registerPeer(ipPort, message.getPodName());
-				}
+				registerPeer(ipPort, message.getPodName());
 			}
 		}
+		//checkMembership();
 	}
 
 	private void removePeer(String ipPort) {
-		SocketClient member = clientMap.remove(ipPort);
+		SocketClient member = members.remove(ipPort);
 		try {
 			if (member != null) {
-				clusterLogger.info("K8 Cluster member leaving [{}]", ipPort);
-				member.setOnline(false);
+				log.debug("member leaving [{}]", ipPort);
+				member.disconnect();
 			} else {
-				clusterLogger.info("K8 Cluster member leaving [{}] but not registered?", ipPort);
+				log.info("cluster member leaving [{}] but not registered?", ipPort);
 			}
 		} catch (Exception e) {
-			clusterLogger.warn("K8 Error disconnecting from member that is leaving cluster:" + ipPort, e);
+			log.warn("Error disconnecting from member that is leaving cluster:" + ipPort, e);
 		}
 	}
 
-	private void registerPeer(String ipPort, String podName) {
+	private void registerPeer(String otherIp, String podName) {
 		try {
-			SocketClient member = SocketClientBuilder.parse(ipPort);
-			member.setOnline(true);
-			clientMap.put(member.getIpPort(), member);
-			clusterLogger.info("K8 Cluster member joined:{} pod:{} members:{}", ipPort, podName, clientMap.keySet());
+			SocketClient member = clientBuilder.build(otherIp, port);
+			if (member.register(registerMessage)) {
+				log.debug("Registered with member:{}", otherIp);
+				members.put(member.getIp(), member);
+			} else {
+				log.warn("Unable to register with member:{}", member);
+			}
 		} catch (Exception e) {
-			clusterLogger.warn("K8 Error connecting to new member joining cluster:" + ipPort + " " + podName, e);
+			log.warn("Error connecting to new member joining cluster:" + otherIp + " " + podName, e);
 		}
 	}
 
@@ -227,17 +217,18 @@ public class K8sClusterBroadcast implements ClusterBroadcast {
 			broadcast(ClusterMessage.transEvent(data));
 
 		} catch (Exception e) {
-			logger.error("K8 Error sending RemoteTransactionEvent " + remoteTransEvent + " to cluster members.", e);
+			log.error("Error sending RemoteTransactionEvent " + remoteTransEvent + " to cluster members.", e);
 		}
 	}
 
 	private void broadcast(ClusterMessage msg) {
 		int errCount = 0;
-		for (SocketClient member : clientMap.values()) {
+		for (SocketClient member : members.values()) {
 			errCount += send(member, msg);
 		}
 		if (errCount > 0) {
-			checkMembership();
+			log.debug("broadcast errors:{}", errCount);
+			checkStatus(true);
 		}
 	}
 
@@ -245,27 +236,27 @@ public class K8sClusterBroadcast implements ClusterBroadcast {
 	 * Leave the cluster.
 	 */
 	private void deregister() {
-		clusterLogger.info("K8 Leaving cluster");
-		ClusterMessage h = ClusterMessage.register(localIpPort, false, podName);
+		log.info("Leaving cluster");
+		ClusterMessage h = ClusterMessage.register(localIp, false, podName);
 		try {
 			broadcast(h);
-			for (SocketClient member : clientMap.values()) {
+			for (SocketClient member : members.values()) {
 				member.disconnect();
 			}
 		} catch (Exception e) {
-			logger.warn("K8 Error while de-registering from cluster", e);
+			log.warn("Error while de-registering from cluster", e);
 		}
 	}
 
 	/**
-	 * Process an incoming Cluster message.
+	 * Process an message return true if done and should disconnect.
 	 */
 	boolean process(SocketConnection request) {
 
 		try {
 			ClusterMessage message = ClusterMessage.read(request.getDataInputStream());
-			if (logger.isTraceEnabled()) {
-				logger.trace("K8 ... received msg: {}", message);
+			if (log.isTraceEnabled()) {
+				log.trace("received msg: {}", message);
 			}
 
 			if (message.isRegisterEvent()) {
@@ -273,34 +264,35 @@ public class K8sClusterBroadcast implements ClusterBroadcast {
 
 			} else {
 				countIncoming.incrementAndGet();
-				RemoteTransactionEvent transEvent = messageReadWrite.read(message.getData());
-				transEvent.run();
+				RemoteTransactionEvent event = messageReadWrite.read(message.getData());
+				if (log.isTraceEnabled()) {
+					log.trace("event:{}", event);
+				}
+				event.run();
 			}
 
-			// instance shutting down
+			// return true of a de-register event
 			return message.isRegisterEvent() && !message.isRegister();
 
 		} catch (InterruptedIOException e) {
-			logger.info("K8 Timeout waiting for message", e);
+			log.info("Timeout waiting for message", e);
 			try {
 				request.disconnect();
 			} catch (IOException ex) {
-				logger.info("K8 Error disconnecting after timeout", ex);
+				log.info("Error disconnecting after timeout", ex);
 			}
 			return true;
 
 		} catch (EOFException e) {
-			logger.warn("K8 EOF disconnecting");
-			return false;
+			log.debug("EOF disconnecting");
+			return true;
 
 		} catch (InvalidMessageException e) {
-			//if (logger.isTraceEnabled()) {
-			//}
-			logger.warn("K8 invalid message key:" + e.getMessageKey());
-			return false;
+			log.warn(e.getMessage());
+			return true;
 
 		} catch (IOException e) {
-			logger.info("K8 IO Error waiting/reading message", e);
+			log.info("IO Error waiting/reading message", e);
 			return true;
 		}
 	}

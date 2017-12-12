@@ -1,8 +1,8 @@
 package io.ebeaninternal.server.cluster.socket;
 
+import io.ebeaninternal.server.cluster.K8sBroadcastFactory;
 import io.ebeaninternal.server.lib.DaemonThreadFactory;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -28,7 +28,7 @@ import java.util.concurrent.Executors;
  */
 class SocketClusterListener implements Runnable {
 
-  private static final Logger logger = LoggerFactory.getLogger(SocketClusterListener.class);
+  private static final Logger log = K8sBroadcastFactory.log;
 
   /**
    * The server socket used to listen for requests.
@@ -69,7 +69,7 @@ class SocketClusterListener implements Runnable {
       this.listenerThread = new Thread(this, "EbeanClusterListener");
 
     } catch (IOException e) {
-      throw new RuntimeException("K8 Error starting cluster socket listener on port " + port, e);
+      throw new RuntimeException("Error starting cluster socket listener on port " + port, e);
     }
   }
 
@@ -77,7 +77,7 @@ class SocketClusterListener implements Runnable {
    * Start listening for requests.
    */
   public void startListening() {
-    logger.trace("K8 ... startListening()");
+    log.trace("startListening");
     this.listenerThread.setDaemon(true);
     this.listenerThread.start();
   }
@@ -100,7 +100,7 @@ class SocketClusterListener implements Runnable {
       listenerThread.interrupt();
       serverListenSocket.close();
     } catch (IOException e) {
-      logger.error("K8 Error shutting down listener", e);
+      log.error("Error shutting down listener", e);
     }
 
     service.shutdown();
@@ -122,17 +122,17 @@ class SocketClusterListener implements Runnable {
         }
       } catch (SocketException e) {
         if (doingShutdown) {
-          logger.debug("K8 doingShutdown and accept threw:" + e.getMessage());
+          log.debug("Doing shutdown and accept threw:" + e.getMessage());
         } else {
-          logger.error("K8 Error while listening", e);
+          log.error("Error while listening", e);
         }
       } catch (InterruptedIOException e) {
         // this will happen when the server is quiet
-        logger.debug("K8 expected due to accept timeout? {}", e.getMessage());
+        log.debug("Expected due to accept timeout? {}", e.getMessage());
 
       } catch (IOException e) {
         // log it and continue in the loop...
-        logger.error("K8 IOException processing cluster message", e);
+        log.error("IOException processing cluster message", e);
       }
     }
   }

@@ -16,13 +16,13 @@ import java.net.Socket;
  */
 class RequestProcessor implements Runnable {
 
-  private static final Logger logger = LoggerFactory.getLogger(RequestProcessor.class);
+  private static final Logger log = LoggerFactory.getLogger(RequestProcessor.class);
 
   private final Socket clientSocket;
 
   private final K8sClusterBroadcast owner;
 
-  private final String hostPort;
+  private final String localIp;
 
   /**
    * Create including the Listener (used to lookup the Request Handler) and
@@ -31,7 +31,7 @@ class RequestProcessor implements Runnable {
   RequestProcessor(K8sClusterBroadcast owner, Socket clientSocket) {
     this.clientSocket = clientSocket;
     this.owner = owner;
-    this.hostPort = owner.getIpPort();
+    this.localIp = owner.getLocalIp();
   }
 
   /**
@@ -42,26 +42,37 @@ class RequestProcessor implements Runnable {
    */
   public void run() {
     try {
-      logger.info("K8 start listening for cluster messages");
       SocketConnection sc = new SocketConnection(clientSocket);
       DataInputStream dataInputStream = sc.getDataInputStream();
       int helloKey = dataInputStream.readInt();
       if (helloKey != MsgKeys.HELLO) {
-        logger.warn("K8 Received Invalid hello {}", helloKey);
+        if (log.isTraceEnabled()) {
+          log.trace("Received Invalid hello {} from {}", helloKey, clientSocket.getRemoteSocketAddress());
+        }
       } else {
-        logger.info("K8 Received hello, reading messages");
+	      String fromMember = dataInputStream.readUTF();
+	      if (log.isDebugEnabled()) {
+          log.debug("reading messages from:{} sa:{}", fromMember, clientSocket.getRemoteSocketAddress());
+        }
         while (true) {
           if (owner.process(sc)) {
             // got the offline message or timeout
             break;
           }
         }
+        if (log.isDebugEnabled()) {
+          log.debug("end of reading messages from:{} sa:{}", fromMember, clientSocket.getRemoteSocketAddress());
+        }
       }
-      logger.info("K8 disconnecting: {}", hostPort);
+      if (log.isTraceEnabled()) {
+        log.trace("disconnecting client {}", clientSocket.getRemoteSocketAddress());
+      }
       sc.disconnect();
 
+      owner.checkStatus(false);
+
     } catch (Exception e) {
-      logger.error("K8 Error listening for messages - " + owner.getIpPort(), e);
+      log.error("Error listening for messages - " + localIp, e);
     }
   }
 

@@ -16,37 +16,37 @@ import java.util.Properties;
  */
 public class K8sBroadcastFactory implements ClusterBroadcastFactory {
 
-	private static final Logger log = LoggerFactory.getLogger(K8sBroadcastFactory.class);
+	public static final Logger log = LoggerFactory.getLogger("io.ebean.cluster.K8s");
 
 	private static final int DEFAULT_PORT = 9911;
 
 	@Override
   public ClusterBroadcast create(ClusterManager manager, ContainerConfig config) {
 
+		if (!config.isActive()) {
+			log.info("Cluster is not active (Refer to ContainerConfig or ebean.cluster.active)");
+			return null;
+		}
+
     if (config.getPort() == 0) {
     	config.setPort(DEFAULT_PORT);
     }
 
-		config.setServiceName("product-range-service");
+		//config.setServiceName("product-range-service");
 
     K8sServiceConfig k8sConfig = new K8sServiceConfig(config);
 		K8sMemberDiscovery discovery = k8sConfig.getDiscovery();
-		K8sServiceMember member = discovery.getMember();
 
+		log.info("Cluster using port:{} serviceName:{} namespace:{} pod:{}", config.getPort(), discovery.getServiceName(), discovery.getNamespace(), discovery.getPodName());
+
+		K8sServiceMember member = discovery.getMember();
 		if (member == null) {
-			String searchedPodName = discovery.getPodName();
+			String podName = discovery.getPodName();
 			K8sServiceMembers members = discovery.getMembers();
-			log.error("K8 Unable to determine current pod Ip searching for[" + searchedPodName + "] in AllMembers:" + members);
+			log.error("Unable to determine current pod Ip searching for pod:" + podName + " in members:" + members);
 			return null;
 		}
 
-
-		try {
-      return new K8sClusterBroadcast(manager, k8sConfig, member);
-
-    } catch (IllegalStateException e) {
-      log.error("K8 Failed to create kubernetes aware cluster", e);
-      return null;
-    }
+    return new K8sClusterBroadcast(manager, k8sConfig, member);
   }
 }
