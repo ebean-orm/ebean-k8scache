@@ -8,9 +8,6 @@ import org.avaje.k8s.discovery.K8sServiceMembers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
-import java.util.Properties;
-
 /**
  * Factory for creating the ClusterBroadcast service.
  */
@@ -32,12 +29,8 @@ public class K8sBroadcastFactory implements ClusterBroadcastFactory {
     	config.setPort(DEFAULT_PORT);
     }
 
-		//config.setServiceName("product-range-service");
-
     K8sServiceConfig k8sConfig = new K8sServiceConfig(config);
 		K8sMemberDiscovery discovery = k8sConfig.getDiscovery();
-
-		log.info("Cluster using port:{} serviceName:{} namespace:{} pod:{}", config.getPort(), discovery.getServiceName(), discovery.getNamespace(), discovery.getPodName());
 
 		K8sServiceMember member = discovery.getMember();
 		if (member == null) {

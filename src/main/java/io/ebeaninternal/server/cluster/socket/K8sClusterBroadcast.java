@@ -65,10 +65,12 @@ public class K8sClusterBroadcast implements ClusterBroadcast {
 		this.port = config.getPort();
 		this.localIp = member.getIpAddress();
 		this.podName = member.getPodName();
+
+		K8sMemberDiscovery discovery = config.getDiscovery();
+		log.info("Cluster using localIp:{} port:{} serviceName:{} namespace:{} pod:{}", localIp, port, discovery.getServiceName(), discovery.getNamespace(), podName);
+
 		this.clientBuilder = new SocketClientBuilder(localIp);
 		this.registerMessage = ClusterMessage.register(localIp, true, podName);
-
-		log.debug("listener using localIp:{} port:{} pod:{} ", localIp, port, podName);
 		this.listener = new SocketClusterListener(this, port, config.getThreadPoolName());
 	}
 
