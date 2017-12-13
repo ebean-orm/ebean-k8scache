@@ -50,3 +50,11 @@ EbeanServer defaultServer = EbeanServerFactory.create(serverConfig);
 
 Periodically the membership of the cluster is checked. By default this is done every
 minute and back off to every 5 minutes. 
+
+
+## Logging
+
+Set logging on `io.ebean.cluster.K8s` to DEBUG or TRACE for this plugin.
+
+Set logging on `io.ebean.cache` to DEBUG or TRACE to view L2 cache activity 
+such as GETs, PUTs etc.  
