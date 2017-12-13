@@ -13,7 +13,7 @@
   <version>11.7.1-SNAPSHOT</version>
 
   <scm>
-    <developerConnection>scm:git:git@github.com:ebean-orm/ebean-cluster.git</developerConnection>
+    <developerConnection>scm:git:git@github.com:ebean-orm/ebean-k8scache.git</developerConnection>
     <tag>HEAD</tag>
   </scm>
 
