@@ -1,12 +1,12 @@
 package io.ebeaninternal.server.cluster.socket;
 
+import io.ebeaninternal.server.cluster.BinaryTransactionEventReader;
 import io.ebeaninternal.server.cluster.ClusterBroadcast;
 import io.ebeaninternal.server.cluster.ClusterManager;
 import io.ebeaninternal.server.cluster.K8sBroadcastFactory;
 import io.ebeaninternal.server.cluster.K8sServiceConfig;
 import io.ebeaninternal.server.cluster.message.ClusterMessage;
 import io.ebeaninternal.server.cluster.message.InvalidMessageException;
-import io.ebeaninternal.server.cluster.message.MessageReadWrite;
 import io.ebeaninternal.server.transaction.RemoteTransactionEvent;
 import org.avaje.k8s.discovery.K8sMemberDiscovery;
 import org.avaje.k8s.discovery.K8sServiceMember;
@@ -38,7 +38,7 @@ public class K8sClusterBroadcast implements ClusterBroadcast {
 
 	private final SocketClusterListener listener;
 
-	private final MessageReadWrite messageReadWrite;
+	private final BinaryTransactionEventReader transactionEventReader;
 
 	private final AtomicLong countOutgoing = new AtomicLong();
 
@@ -60,7 +60,7 @@ public class K8sClusterBroadcast implements ClusterBroadcast {
 
 	public K8sClusterBroadcast(ClusterManager manager, K8sServiceConfig config, K8sServiceMember member) {
 
-		this.messageReadWrite = new MessageReadWrite(manager);
+		this.transactionEventReader = new BinaryTransactionEventReader(manager);
 		this.config = config;
 		this.port = config.getPort();
 		this.localIp = member.getIpAddress();
@@ -215,7 +215,7 @@ public class K8sClusterBroadcast implements ClusterBroadcast {
 	public void broadcast(RemoteTransactionEvent remoteTransEvent) {
 		try {
 			countOutgoing.incrementAndGet();
-			byte[] data = messageReadWrite.write(remoteTransEvent);
+			byte[] data = remoteTransEvent.writeBinaryAsBytes(256);
 			broadcast(ClusterMessage.transEvent(data));
 
 		} catch (Exception e) {
@@ -266,7 +266,7 @@ public class K8sClusterBroadcast implements ClusterBroadcast {
 
 			} else {
 				countIncoming.incrementAndGet();
-				RemoteTransactionEvent event = messageReadWrite.read(message.getData());
+				RemoteTransactionEvent event = transactionEventReader.read(message.getData());
 				if (log.isTraceEnabled()) {
 					log.trace("event:{}", event);
 				}

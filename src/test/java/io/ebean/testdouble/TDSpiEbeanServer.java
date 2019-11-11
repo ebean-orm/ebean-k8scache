@@ -1,40 +1,5 @@
 package io.ebean.testdouble;
 
-import io.ebean.AutoTune;
-import io.ebean.BeanState;
-import io.ebean.ExpressionFactory;
-import io.ebean.PersistenceContextScope;
-import io.ebean.Query;
-import io.ebean.TDEbeanServer;
-import io.ebean.Transaction;
-import io.ebean.TxScope;
-import io.ebean.ValuePair;
-import io.ebean.bean.BeanCollection;
-import io.ebean.bean.CallStack;
-import io.ebean.bean.EntityBeanIntercept;
-import io.ebean.bean.ObjectGraphNode;
-import io.ebean.config.ServerConfig;
-import io.ebean.config.dbplatform.DatabasePlatform;
-import io.ebean.event.readaudit.ReadAuditLogger;
-import io.ebean.event.readaudit.ReadAuditPrepare;
-import io.ebean.meta.MetaInfoManager;
-import io.ebeaninternal.api.LoadBeanRequest;
-import io.ebeaninternal.api.LoadManyRequest;
-import io.ebeaninternal.api.ScopeTrans;
-import io.ebeaninternal.api.SpiEbeanServer;
-import io.ebeaninternal.api.SpiQuery;
-import io.ebeaninternal.api.SpiTransaction;
-import io.ebeaninternal.api.TransactionEventTable;
-import io.ebeaninternal.server.core.timezone.DataTimeZone;
-import io.ebeaninternal.server.deploy.BeanDescriptor;
-import io.ebeaninternal.server.query.CQuery;
-import io.ebeaninternal.server.transaction.RemoteTransactionEvent;
-
-import java.lang.reflect.Type;
-import java.util.List;
-import java.util.Map;
-
-
 /**
  * Test double for SpiEbeanServer.
  */
