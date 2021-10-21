@@ -28,7 +28,7 @@
     <dependency>
       <groupId>io.ebean</groupId>
       <artifactId>ebean</artifactId>
-      <version>12.6.1</version>
+      <version>12.6.2</version>
       <scope>provided</scope>
     </dependency>
 
@@ -58,7 +58,7 @@
         <extensions>true</extensions>
         <configuration>
           <tiles>
-            <tile>io.ebean.tile:enhancement:12.6.1</tile>
+            <tile>io.ebean.tile:enhancement:12.6.2</tile>
           </tiles>
         </configuration>
       </plugin>

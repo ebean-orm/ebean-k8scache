@@ -1,7 +1,7 @@
 package io.ebeaninternal.server.cluster.socket;
 
 import io.ebeaninternal.server.cluster.K8sBroadcastFactory;
-import io.ebeaninternal.server.lib.DaemonThreadFactory;
+import io.ebeaninternal.server.executor.DaemonThreadFactory;
 import org.slf4j.Logger;
 
 import java.io.IOException;
