@@ -14,7 +14,7 @@ ebean:
   cluster:
     active: true
     serviceName: my-service
-    namespace: ${POD_NAMESPACE:my-namespace}
+    namespace: my-namespace
     podName: ${POD_NAME}
     port: 9911
 ```
@@ -22,8 +22,8 @@ ebean:
 The above means that ebean-k8scache will discover all the pods for
 `my-service` and join them as a cluster using port 9911.
 
-**Note:** To discovery succeed the k8s ServiceAccount must have access to request api 
-`/api/v1/namespaces/${namespace}/endpoints/${serviceName}`. 
+**Note:** To discovery process succeed the k8s ServiceAccount must have access to request api 
+`/api/v1/namespaces/${namespace}/endpoints/${serviceName}` and the Pod must expose the `POD_NAME` system variable to the container.  
 
 All the pods will run a L2 Cache and cache invalidation messages will
 be propagated to all the pods in the cluster as needed.
