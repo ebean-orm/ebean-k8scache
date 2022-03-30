@@ -1,6 +1,6 @@
-package io.ebeaninternal.server.cluster.message;
+package io.ebean.k8scache.message;
 
-import io.ebeaninternal.server.cluster.socket.MsgKeys;
+import io.ebean.k8scache.socket.MsgKeys;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;

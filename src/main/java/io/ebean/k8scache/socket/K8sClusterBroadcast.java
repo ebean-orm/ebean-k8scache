@@ -1,12 +1,12 @@
-package io.ebeaninternal.server.cluster.socket;
+package io.ebean.k8scache.socket;
 
 import io.ebeaninternal.server.cluster.BinaryTransactionEventReader;
 import io.ebeaninternal.server.cluster.ClusterBroadcast;
 import io.ebeaninternal.server.cluster.ClusterManager;
-import io.ebeaninternal.server.cluster.K8sBroadcastFactory;
-import io.ebeaninternal.server.cluster.K8sServiceConfig;
-import io.ebeaninternal.server.cluster.message.ClusterMessage;
-import io.ebeaninternal.server.cluster.message.InvalidMessageException;
+import io.ebean.k8scache.K8sBroadcastFactory;
+import io.ebean.k8scache.K8sServiceConfig;
+import io.ebean.k8scache.message.ClusterMessage;
+import io.ebean.k8scache.message.InvalidMessageException;
 import io.ebeaninternal.server.transaction.RemoteTransactionEvent;
 import org.avaje.k8s.discovery.K8sMemberDiscovery;
 import org.avaje.k8s.discovery.K8sServiceMember;

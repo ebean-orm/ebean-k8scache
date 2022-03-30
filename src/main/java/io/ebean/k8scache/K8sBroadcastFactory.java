@@ -1,7 +1,10 @@
-package io.ebeaninternal.server.cluster;
+package io.ebean.k8scache;
 
 import io.ebean.config.ContainerConfig;
-import io.ebeaninternal.server.cluster.socket.K8sClusterBroadcast;
+import io.ebeaninternal.server.cluster.ClusterBroadcast;
+import io.ebeaninternal.server.cluster.ClusterBroadcastFactory;
+import io.ebeaninternal.server.cluster.ClusterManager;
+import io.ebean.k8scache.socket.K8sClusterBroadcast;
 import org.avaje.k8s.discovery.K8sMemberDiscovery;
 import org.avaje.k8s.discovery.K8sServiceMember;
 import org.avaje.k8s.discovery.K8sServiceMembers;

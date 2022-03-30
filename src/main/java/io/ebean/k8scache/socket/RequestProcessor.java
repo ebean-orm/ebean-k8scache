@@ -1,4 +1,4 @@
-package io.ebeaninternal.server.cluster.socket;
+package io.ebean.k8scache.socket;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

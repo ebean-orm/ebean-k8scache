@@ -1,4 +1,4 @@
-package io.ebeaninternal.server.cluster;
+package io.ebean.k8scache;
 
 import io.ebean.config.ContainerConfig;
 import org.avaje.k8s.discovery.K8sMemberDiscovery;

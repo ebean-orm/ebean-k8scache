@@ -1,7 +1,7 @@
-package io.ebeaninternal.server.cluster.socket;
+package io.ebean.k8scache.socket;
 
-import io.ebeaninternal.server.cluster.K8sBroadcastFactory;
-import io.ebeaninternal.server.cluster.message.ClusterMessage;
+import io.ebean.k8scache.K8sBroadcastFactory;
+import io.ebean.k8scache.message.ClusterMessage;
 import org.slf4j.Logger;
 
 import java.io.BufferedOutputStream;

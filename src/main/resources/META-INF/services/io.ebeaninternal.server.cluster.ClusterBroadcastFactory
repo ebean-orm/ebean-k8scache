@@ -1,1 +1,1 @@
-io.ebeaninternal.server.cluster.K8sBroadcastFactory
+io.ebean.k8scache.K8sBroadcastFactory

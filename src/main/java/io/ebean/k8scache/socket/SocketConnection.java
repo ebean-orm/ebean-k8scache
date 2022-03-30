@@ -1,4 +1,4 @@
-package io.ebeaninternal.server.cluster.socket;
+package io.ebean.k8scache.socket;
 
 import java.io.DataInputStream;
 import java.io.IOException;

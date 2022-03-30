@@ -1,4 +1,4 @@
-package io.ebeaninternal.server.cluster.message;
+package io.ebean.k8scache.message;
 
 public class InvalidMessageException extends Exception {
 
