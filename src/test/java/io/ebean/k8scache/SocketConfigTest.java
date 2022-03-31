@@ -1,4 +1,4 @@
-package io.ebeaninternal.server.cluster;
+package io.ebean.k8scache;
 
 import org.testng.annotations.Test;
 

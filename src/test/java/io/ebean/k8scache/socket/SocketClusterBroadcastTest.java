@@ -1,20 +1,5 @@
-package io.ebeaninternal.server.cluster.socket;
+package io.ebean.k8scache.socket;
 
-
-import io.ebean.config.ContainerConfig;
-import io.ebeaninternal.api.TransactionEventTable;
-import io.ebeaninternal.server.cluster.ClusterManager;
-import io.ebeaninternal.server.transaction.RemoteTransactionEvent;
-import io.ebean.testdouble.TDSpiEbeanServer;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.Test;
-
-import java.util.Properties;
-
-import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
 
 public class SocketClusterBroadcastTest {
 
