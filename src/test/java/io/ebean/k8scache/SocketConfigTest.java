@@ -1,12 +1,5 @@
 package io.ebean.k8scache;
 
-import org.testng.annotations.Test;
-
-import java.util.Arrays;
-import java.util.Properties;
-
-import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
-import static org.testng.Assert.*;
 
 public class SocketConfigTest {
 

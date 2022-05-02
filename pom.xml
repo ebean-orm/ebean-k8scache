@@ -5,7 +5,7 @@
   <parent>
     <groupId>org.avaje</groupId>
     <artifactId>java11-oss</artifactId>
-    <version>3.6</version>
+    <version>3.8</version>
   </parent>
 
   <groupId>io.ebean</groupId>
@@ -16,6 +16,10 @@
     <developerConnection>scm:git:git@github.com:ebean-orm/ebean-k8scache.git</developerConnection>
     <tag>HEAD</tag>
   </scm>
+
+  <properties>
+    <nexus.staging.autoReleaseAfterClose>false</nexus.staging.autoReleaseAfterClose>
+  </properties>
 
   <dependencies>
 
@@ -28,7 +32,7 @@
     <dependency>
       <groupId>io.ebean</groupId>
       <artifactId>ebean</artifactId>
-      <version>13.0.0</version>
+      <version>13.5.0</version>
       <scope>provided</scope>
     </dependency>
 
@@ -40,9 +44,9 @@
     </dependency>
 
     <dependency>
-      <groupId>org.avaje.composite</groupId>
-      <artifactId>composite-testing</artifactId>
-      <version>3.1</version>
+      <groupId>io.avaje</groupId>
+      <artifactId>junit</artifactId>
+      <version>1.1</version>
       <scope>test</scope>
     </dependency>
 
@@ -58,7 +62,7 @@
         <extensions>true</extensions>
         <configuration>
           <tiles>
-            <tile>io.ebean.tile:enhancement:13.0.0</tile>
+            <tile>io.ebean.tile:enhancement:13.5.0</tile>
           </tiles>
         </configuration>
       </plugin>
